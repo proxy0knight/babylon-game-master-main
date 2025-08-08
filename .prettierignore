@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+babylon-server/venv/
+
+# Build outputs
+dist/
+build/
+
+# Generated files
+*.min.js
+*.min.css
+
+# Logs
+*.log
+logs/
+
+# Package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env*
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation that should maintain specific formatting
+CHANGELOG.md
+LICENSE
+

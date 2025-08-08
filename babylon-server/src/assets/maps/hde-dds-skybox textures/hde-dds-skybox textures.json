@@ -1,0 +1,7 @@
+{
+  "name": "hde-dds-skybox textures",
+  "type": "map",
+  "code": "var createScene = function () {\n    var scene = new BABYLON.Scene();\n    // This creates and positions a free camera (non-mesh)\n    var camera = new BABYLON.ArcRotateCamera(\"camera1\", 0,  Math.PI / 2, 10, BABYLON.Vector3.Zero(), scene);\n\n    // This targets the camera to scene origin\n    camera.setTarget(BABYLON.Vector3.Zero());\n\n    // This attaches the camera to the canvas\n    camera.attachControl(canvas, true);\n\n    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)\n    var light = new BABYLON.HemisphericLight(\"light1\", new BABYLON.Vector3(0, 1, 0), scene);\n\n    // Default intensity is 1. Let's dim the light a small amount\n    light.intensity = 0.7;\n\n    // Our built-in 'ground' shape. Params: name, width, depth, subdivs, scene\n    var ground = BABYLON.Mesh.CreateSphere(\"ground1\", 32, 1, scene);\n\n    var groundMaterial = new BABYLON.StandardMaterial(\"ground\", scene);\n\n    var hdrTexture = new BABYLON.CubeTexture(\"/external-import/skybox.dds\", scene);\n    scene.createDefaultSkybox(hdrTexture, true, 10000);\n \n\n\treturn scene;\n}\n",
+  "created_at": "2025-08-08T00:36:13.617340",
+  "updated_at": "2025-08-08T00:36:13.617352"
+}

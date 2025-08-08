@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5001/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - babylon-network
+
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - API_HOST=0.0.0.0
+      - API_PORT=5001
+      - CORS_ORIGINS=http://localhost:3000
+    volumes:
+      - ./babylon-server/data:/app/data
+      - ./babylon-server/logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - babylon-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - babylon-network
+
+  # Redis Cache (Optional - for future use)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - babylon-network
+    command: redis-server --appendonly yes
+
+networks:
+  babylon-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+

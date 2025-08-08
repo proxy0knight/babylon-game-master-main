@@ -1,0 +1,88 @@
+{
+  "gameSettings": {
+    "title": "Babylon.js Game Environment",
+    "version": "1.0.0",
+    "engine": {
+      "preferWebGPU": true,
+      "antialias": true,
+      "powerPreference": "high-performance"
+    },
+    "scene": {
+      "clearColor": [0.1, 0.2, 0.3],
+      "gravity": [0, -9.81, 0],
+      "fogEnabled": false
+    },
+    "camera": {
+      "type": "ArcRotate",
+      "position": [0, 5, -10],
+      "target": [0, 0, 0],
+      "fov": 0.8,
+      "nearPlane": 0.1,
+      "farPlane": 1000
+    },
+    "lighting": {
+      "ambient": {
+        "intensity": 0.7,
+        "color": [1, 1, 1]
+      },
+      "directional": {
+        "intensity": 0.5,
+        "direction": [-1, -1, -1],
+        "color": [1, 1, 1]
+      }
+    }
+  },
+  "assets": {
+    "models": [],
+    "textures": [],
+    "sounds": []
+  },
+  "maps": [
+    {
+      "id": "default",
+      "name": "الخريطة الافتراضية",
+      "description": "خريطة أساسية للاختبار",
+      "objects": [
+        {
+          "type": "ground",
+          "name": "ground",
+          "size": [20, 20],
+          "position": [0, 0, 0],
+          "material": {
+            "diffuseColor": [0.3, 0.5, 0.3],
+            "specularColor": [0, 0, 0]
+          }
+        },
+        {
+          "type": "box",
+          "name": "testBox",
+          "size": 2,
+          "position": [0, 1, 0],
+          "material": {
+            "diffuseColor": [0.8, 0.2, 0.2]
+          },
+          "animation": {
+            "type": "rotation",
+            "speed": 0.01,
+            "axis": "y"
+          }
+        }
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "id": "player",
+      "name": "اللاعب",
+      "type": "playable",
+      "model": null,
+      "position": [0, 1.8, -5],
+      "properties": {
+        "speed": 5,
+        "jumpHeight": 2,
+        "health": 100
+      }
+    }
+  ]
+}
+

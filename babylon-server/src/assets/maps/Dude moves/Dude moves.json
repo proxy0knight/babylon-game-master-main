@@ -1,0 +1,7 @@
+{
+  "name": "Dude moves",
+  "type": "map",
+  "code": "var delayCreateScene = function () {\n    \n    var scene = new BABYLON.Scene(engine);  \n\n    BABYLON.ImportMeshAsync(\"external-import/scenes/Dude/Dude.babylon\", scene).then(\n        function (result) {          \n            scene.createDefaultCameraOrLight(true, true, true);\n            scene.createDefaultEnvironment();\n            \n            scene.beginAnimation(result.skeletons[0], 0, 100, true, 1.0);\n        }\n    );\n\n    return scene;\n};",
+  "created_at": "2025-07-29T16:02:00.207791",
+  "updated_at": "2025-07-29T16:02:00.207801"
+}

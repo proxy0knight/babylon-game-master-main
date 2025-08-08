@@ -1,0 +1,7 @@
+{
+  "name": "Default scene",
+  "type": "map",
+  "code": "// المشهد الافتراضي - أرضية بسيطة مع كرة\nvar createScene = function () {\n    // إنشاء المشهد الأساسي (غير شبكي)\n    var scene = new BABYLON.Scene(engine);\n\n    // إنشاء وتموضع الكاميرا الحرة (غير شبكية)\n    var camera = new BABYLON.FreeCamera(\"camera1\", new BABYLON.Vector3(0, 5, -10), scene);\n\n    // توجيه الكاميرا نحو مركز المشهد\n    camera.setTarget(BABYLON.Vector3.Zero());\n\n    // ربط الكاميرا بالـ canvas\n    camera.attachControl(canvas, true);\n\n    // إنشاء الإضاءة، موجهة نحو 0,1,0 - نحو السماء (غير شبكية)\n    var light = new BABYLON.HemisphericLight(\"light\", new BABYLON.Vector3(0, 1, 0), scene);\n\n    // الشدة الافتراضية هي 1. دعنا نخفف الإضاءة قليلاً\n    light.intensity = 0.7;\n\n    // الشكل المدمج 'كرة'\n    var sphere = BABYLON.MeshBuilder.CreateSphere(\"sphere\", {diameter: 2, segments: 32}, scene);\n\n    // رفع الكرة لأعلى بنصف ارتفاعها\n    sphere.position.y = 1;\n\n    // الشكل المدمج 'أرضية'\n    var ground = BABYLON.MeshBuilder.CreateGround(\"ground\", {width: 6, height: 6}, scene);\n\n    return scene;\n};\n\n// إنشاء المشهد\nvar scene = createScene();",
+  "created_at": "2025-07-29T13:21:54.120011",
+  "updated_at": "2025-07-29T13:21:54.120024"
+}
