@@ -1065,21 +1065,73 @@ export class SceneBuilder {
       const res = await this.api.saveAsset('scene', name, data);
       if (res?.success) {
         await this.captureAndSaveThumbnail('scene', name);
-        // Also move any imported external assets into the project's assets folder for this scene
-        try {
-          await fetch('http://localhost:5001/api/assets/move-external-to-project', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'scene', name })
-          });
-        } catch {}
-      alert('تم الحفظ بنجاح');
+        
+        // Bundle assets with scene
+        await this.bundleSceneAssets(name, data);
+        
+        alert('تم الحفظ بنجاح مع الأصول');
       } else {
         alert('فشل الحفظ');
       }
     } catch (e) {
       alert('فشل الحفظ');
     }
+  }
+
+  private async bundleSceneAssets(sceneName: string, sceneCode: string): Promise<void> {
+    try {
+      console.log('Bundling assets for scene:', sceneName);
+      
+      // Bundle scene assets (this saves external-import contents to scene's assets folder)
+      const bundleResponse = await fetch('http://localhost:5001/api/assets/bundle-scene-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sceneName, 
+          sceneCode
+        })
+      });
+      
+      if (!bundleResponse.ok) {
+        const errorText = await bundleResponse.text();
+        console.error('Bundle assets response error:', errorText);
+        throw new Error('Failed to bundle scene assets');
+      } else {
+        const bundleResult = await bundleResponse.json();
+        console.log('Assets bundled successfully:', bundleResult);
+      }
+      
+    } catch (error) {
+      console.error('Asset bundling failed:', error);
+      alert('فشل في تجميع الأصول - تحقق من اتصال الخادم');
+    }
+  }
+
+  private extractAssetReferences(code: string): string[] {
+    const references: string[] = [];
+    
+    // Extract references to external-import assets
+    const externalImportRegex = /['"`].*?\/external-import\/([^'"`]+)['"`]/g;
+    let match;
+    while ((match = externalImportRegex.exec(code)) !== null) {
+      references.push(match[1]);
+    }
+    
+    // Extract SceneLoader references
+    const sceneLoaderRegex = /SceneLoader\.\w+\([^,]*['"`]([^'"`]+)['"`]/g;
+    while ((match = sceneLoaderRegex.exec(code)) !== null) {
+      if (match[1].includes('external-import/')) {
+        references.push(match[1].replace('external-import/', ''));
+      }
+    }
+    
+    // Extract mesh/texture asset names used in the code
+    const assetNameRegex = /(?:loadAsset|importMesh|loadTexture)\([^,]*['"`]([^'"`]+)['"`]/g;
+    while ((match = assetNameRegex.exec(code)) !== null) {
+      references.push(match[1]);
+    }
+    
+    return [...new Set(references)]; // Remove duplicates
   }
 
   private async copyProjectAssets(type: 'map' | 'character' | 'object' | 'scene' | 'code', name: string): Promise<void> {

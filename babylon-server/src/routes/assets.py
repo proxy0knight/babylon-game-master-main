@@ -423,6 +423,8 @@ def move_external_to_project():
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -544,4 +546,212 @@ def copy_project_assets():
         
     except Exception as e:
         return jsonify({'error': f'خطأ في نسخ أصول المشروع: {str(e)}'}), 500
+
+@assets_bp.route('/bundle-scene-assets', methods=['POST'])
+def bundle_scene_assets():
+    """تجميع أصول المشهد مع البيانات في مجلد المشروع"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'لا توجد بيانات'}), 400
+        
+        scene_name = data.get('sceneName')
+        scene_code = data.get('sceneCode', '')
+        
+        if not scene_name:
+            return jsonify({'error': 'اسم المشهد مطلوب'}), 400
+        
+        # مجلد المشهد
+        scene_folder = os.path.join(SCENES_DIR, scene_name)
+        
+        if not os.path.exists(scene_folder):
+            return jsonify({'error': 'مجلد المشهد غير موجود'}), 404
+        
+        bundled_files = []
+        
+        # نسخ جميع الملفات من external-import إلى مجلد assets داخل المشهد
+        if os.path.exists(EXTERNAL_IMPORT_DIR):
+            assets_folder = os.path.join(scene_folder, 'assets')
+            os.makedirs(assets_folder, exist_ok=True)
+            
+            for item in os.listdir(EXTERNAL_IMPORT_DIR):
+                source_path = os.path.join(EXTERNAL_IMPORT_DIR, item)
+                dest_path = os.path.join(assets_folder, item)
+                
+                if os.path.isdir(source_path):
+                    if os.path.exists(dest_path):
+                        shutil.rmtree(dest_path)
+                    shutil.copytree(source_path, dest_path)
+                else:
+                    shutil.copy2(source_path, dest_path)
+                
+                bundled_files.append(item)
+        
+        return jsonify({
+            'success': True,
+            'message': f'تم تجميع {len(bundled_files)} عنصر مع المشهد',
+            'bundledFiles': bundled_files
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'خطأ في تجميع أصول المشهد: {str(e)}'}), 500
+
+@assets_bp.route('/bundle-flow-project', methods=['POST'])
+def bundle_flow_project():
+    """تجميع مشروع كامل للمخطط مع جميع المشاهد والأصول"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'لا توجد بيانات'}), 400
+        
+        flow_name = data.get('flowName')
+        scene_names = data.get('sceneNames', [])
+        flow_data = data.get('flowData', {})
+        
+        if not flow_name:
+            return jsonify({'error': 'اسم المخطط مطلوب'}), 400
+        
+        # مجلد المخطط
+        flow_folder = os.path.join(FLOW_DIR, flow_name)
+        
+        if not os.path.exists(flow_folder):
+            return jsonify({'error': 'مجلد المخطط غير موجود'}), 404
+        
+        # إنشاء مجلد assets داخل مجلد المخطط
+        flow_assets_folder = os.path.join(flow_folder, 'assets')
+        os.makedirs(flow_assets_folder, exist_ok=True)
+        
+        bundled_scenes = []
+        total_bundled_files = 0
+        
+        # جمع جميع المشاهد وأصولها
+        for scene_name in scene_names:
+            scene_folder = os.path.join(SCENES_DIR, scene_name)
+            scene_assets_folder = os.path.join(scene_folder, 'assets')
+            
+            if os.path.exists(scene_folder):
+                # نسخ بيانات المشهد
+                scene_json_file = os.path.join(scene_folder, f"{scene_name}.json")
+                if os.path.exists(scene_json_file):
+                    dest_scene_file = os.path.join(flow_assets_folder, f"scene_{scene_name}.json")
+                    shutil.copy2(scene_json_file, dest_scene_file)
+                    bundled_scenes.append(scene_name)
+                
+                # نسخ أصول المشهد إذا كانت موجودة
+                if os.path.exists(scene_assets_folder):
+                    scene_assets_dest = os.path.join(flow_assets_folder, f"scene_{scene_name}_assets")
+                    if os.path.exists(scene_assets_dest):
+                        shutil.rmtree(scene_assets_dest)
+                    shutil.copytree(scene_assets_folder, scene_assets_dest)
+                    
+                    # حساب عدد الملفات المنسوخة
+                    for root, dirs, files in os.walk(scene_assets_dest):
+                        total_bundled_files += len(files)
+        
+        # نسخ أي أصول من external-import إلى المخطط
+        if os.path.exists(EXTERNAL_IMPORT_DIR):
+            external_assets_dest = os.path.join(flow_assets_folder, 'external_assets')
+            if os.path.exists(external_assets_dest):
+                shutil.rmtree(external_assets_dest)
+            shutil.copytree(EXTERNAL_IMPORT_DIR, external_assets_dest)
+            
+            for root, dirs, files in os.walk(external_assets_dest):
+                total_bundled_files += len(files)
+        
+        return jsonify({
+            'success': True,
+            'message': f'تم تجميع مشروع المخطط مع {len(bundled_scenes)} مشهد و {total_bundled_files} ملف',
+            'bundledScenes': bundled_scenes,
+            'totalFiles': total_bundled_files
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'خطأ في تجميع مشروع المخطط: {str(e)}'}), 500
+
+@assets_bp.route('/restore-flow-assets', methods=['POST'])
+def restore_flow_assets():
+    """استعادة أصول المخطط إلى مجلد external-import للعب"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'لا توجد بيانات'}), 400
+        
+        flow_name = data.get('flowName')
+        
+        if not flow_name:
+            return jsonify({'error': 'اسم المخطط مطلوب'}), 400
+        
+        # مجلد المخطط
+        flow_folder = os.path.join(FLOW_DIR, flow_name)
+        flow_assets_folder = os.path.join(flow_folder, 'assets')
+        
+        if not os.path.exists(flow_assets_folder):
+            return jsonify({
+                'success': True,
+                'foundAssets': False,
+                'message': 'لا توجد أصول محفوظة في المخطط'
+            })
+        
+        # إنشاء مجلد external-import
+        os.makedirs(EXTERNAL_IMPORT_DIR, exist_ok=True)
+        
+        restored_files = 0
+        restored_scenes = []
+        
+        # استعادة جميع الأصول من مجلد المخطط
+        for item in os.listdir(flow_assets_folder):
+            source_path = os.path.join(flow_assets_folder, item)
+            
+            if item.startswith('scene_') and item.endswith('.json'):
+                # ملف مشهد - نسخه إلى scenes folder إذا لزم الأمر
+                scene_name = item.replace('scene_', '').replace('.json', '')
+                scene_folder = os.path.join(SCENES_DIR, scene_name)
+                os.makedirs(scene_folder, exist_ok=True)
+                dest_path = os.path.join(scene_folder, f"{scene_name}.json")
+                shutil.copy2(source_path, dest_path)
+                restored_scenes.append(scene_name)
+                
+            elif item.startswith('scene_') and item.endswith('_assets'):
+                # مجلد أصول مشهد - نسخ الأصول إلى external-import
+                if os.path.isdir(source_path):
+                    for asset_item in os.listdir(source_path):
+                        asset_source = os.path.join(source_path, asset_item)
+                        asset_dest = os.path.join(EXTERNAL_IMPORT_DIR, asset_item)
+                        
+                        if os.path.isdir(asset_source):
+                            if os.path.exists(asset_dest):
+                                shutil.rmtree(asset_dest)
+                            shutil.copytree(asset_source, asset_dest)
+                        else:
+                            shutil.copy2(asset_source, asset_dest)
+                        restored_files += 1
+                        
+            elif item == 'external_assets':
+                # أصول خارجية - نسخها مباشرة إلى external-import
+                if os.path.isdir(source_path):
+                    for ext_item in os.listdir(source_path):
+                        ext_source = os.path.join(source_path, ext_item)
+                        ext_dest = os.path.join(EXTERNAL_IMPORT_DIR, ext_item)
+                        
+                        if os.path.isdir(ext_source):
+                            if os.path.exists(ext_dest):
+                                shutil.rmtree(ext_dest)
+                            shutil.copytree(ext_source, ext_dest)
+                        else:
+                            shutil.copy2(ext_source, ext_dest)
+                        restored_files += 1
+        
+        return jsonify({
+            'success': True,
+            'foundAssets': True,
+            'message': f'تم استعادة {restored_files} ملف من {len(restored_scenes)} مشهد',
+            'restoredFiles': restored_files,
+            'restoredScenes': restored_scenes
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'خطأ في استعادة أصول المخطط: {str(e)}'}), 500
 

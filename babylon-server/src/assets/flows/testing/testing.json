@@ -1,0 +1,7 @@
+{
+  "name": "testing",
+  "type": "flow",
+  "code": "{\"nodes\":[{\"id\":10,\"name\":\"Game Start\",\"x\":265.33331298828125,\"y\":278,\"triggers\":[]},{\"id\":11,\"name\":\"dancing\",\"x\":501.39581298828125,\"y\":291.1458282470703,\"triggers\":[]}],\"edges\":[{\"id\":10,\"fromNodeId\":10,\"fromPort\":\"right\",\"toNodeId\":11,\"toPort\":\"top\",\"mode\":\"replace\"}]}",
+  "created_at": "2025-08-09T17:49:48.427002",
+  "updated_at": "2025-08-09T17:49:48.427011"
+}

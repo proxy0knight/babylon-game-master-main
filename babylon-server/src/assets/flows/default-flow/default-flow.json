@@ -1,7 +1,7 @@
 {
   "name": "default-flow",
   "type": "flow",
-  "code": "{\"nodes\":[{\"id\":1,\"name\":\"Game Start\",\"x\":124,\"y\":-23.04168701171875}],\"edges\":[]}",
-  "created_at": "2025-08-09T15:15:42.438074",
-  "updated_at": "2025-08-09T15:15:42.438085"
+  "code": "{\"nodes\":[{\"id\":6,\"name\":\"Game Start\",\"x\":318.6666717529297,\"y\":283.33331298828125,\"triggers\":[]},{\"id\":7,\"name\":\"scene\",\"x\":535.3958129882812,\"y\":151.1458282470703,\"triggers\":[]},{\"id\":9,\"name\":\"testing\",\"x\":523.0624694824219,\"y\":301.1457977294922,\"triggers\":[\"myTrigger1\"]}],\"edges\":[{\"id\":7,\"fromNodeId\":9,\"fromPort\":\"myTrigger1\",\"toNodeId\":7,\"toPort\":\"bottom\",\"mode\":\"replace\"},{\"id\":8,\"fromNodeId\":9,\"fromPort\":\"right\",\"toNodeId\":6,\"toPort\":\"right\",\"mode\":\"replace\"}]}",
+  "created_at": "2025-08-09T17:44:00.961376",
+  "updated_at": "2025-08-09T17:44:00.961386"
 }

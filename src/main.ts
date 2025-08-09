@@ -26,6 +26,7 @@ class BabylonGameApp {
     private initializeRoutes(): void {
         this.router.addRoute('/', () => this.showMainMenu());
         this.router.addRoute('/game', () => this.showGame());
+        this.router.addRoute('/game-runner', () => this.showGameRunner());
         this.router.addRoute('/admin', () => this.showAdmin());
         this.router.addRoute('/admin/scene-builder', () => this.showSceneBuilder());
     this.router.addRoute('/admin/scene-flow', () => this.showSceneFlow());
@@ -41,12 +42,21 @@ class BabylonGameApp {
     }
 
     /**
-     * عرض اللعبة
+     * عرض اللعبة - يحمل المخطط النشط إن وجد أو المشهد الافتراضي
      */
     private showGame(): void {
         this.clearContainer();
         const gameEngine = new GameEngine(this.appContainer, this.router);
-        gameEngine.initialize();
+        gameEngine.initializeWithActiveFlow();
+    }
+
+    /**
+     * عرض مشغل اللعبة بالمخطط النشط
+     */
+    private showGameRunner(): void {
+        this.clearContainer();
+        const gameEngine = new GameEngine(this.appContainer, this.router);
+        gameEngine.initializeWithActiveFlow();
     }
 
     /**
