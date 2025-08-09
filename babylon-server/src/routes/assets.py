@@ -13,12 +13,15 @@ ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets')
 MAPS_DIR = os.path.join(ASSETS_DIR, 'maps')
 CHARACTERS_DIR = os.path.join(ASSETS_DIR, 'characters')
 OBJECTS_DIR = os.path.join(ASSETS_DIR, 'objects')
+SCENES_DIR = os.path.join(ASSETS_DIR, 'scenes')
+FLOW_DIR = os.path.join(ASSETS_DIR, 'flows')
+CODELIB_DIR = os.path.join(ASSETS_DIR, 'code-library')
 
 # مجلد الاستيراد الخارجي المؤقت (في المجلد الجذر للمشروع)
 EXTERNAL_IMPORT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'public', 'external-import')
 
 # إنشاء المجلدات إذا لم تكن موجودة
-for directory in [ASSETS_DIR, MAPS_DIR, CHARACTERS_DIR, OBJECTS_DIR]:
+for directory in [ASSETS_DIR, MAPS_DIR, CHARACTERS_DIR, OBJECTS_DIR, SCENES_DIR, FLOW_DIR, CODELIB_DIR]:
     os.makedirs(directory, exist_ok=True)
 
 @assets_bp.route('/save', methods=['POST'])
@@ -30,7 +33,7 @@ def save_asset():
         if not data:
             return jsonify({'error': 'لا توجد بيانات'}), 400
         
-        asset_type = data.get('type')  # map, character, object
+        asset_type = data.get('type')  # map, character, object, scene, flow, code
         asset_name = data.get('name')
         asset_code = data.get('code')
         
@@ -44,6 +47,12 @@ def save_asset():
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'flow':
+            target_dir = FLOW_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -87,6 +96,12 @@ def load_asset(asset_type, asset_name):
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'flow':
+            target_dir = FLOW_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -120,6 +135,12 @@ def list_assets(asset_type):
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'flow':
+            target_dir = FLOW_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -167,6 +188,12 @@ def delete_asset(asset_type, asset_name):
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'flow':
+            target_dir = FLOW_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -211,6 +238,12 @@ def save_thumbnail():
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'flow':
+            target_dir = FLOW_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -249,6 +282,8 @@ def get_thumbnail(asset_type, asset_name):
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         
@@ -456,6 +491,10 @@ def copy_project_assets():
             target_dir = CHARACTERS_DIR
         elif asset_type == 'object':
             target_dir = OBJECTS_DIR
+        elif asset_type == 'scene':
+            target_dir = SCENES_DIR
+        elif asset_type == 'code':
+            target_dir = CODELIB_DIR
         else:
             return jsonify({'error': 'نوع الأصل غير صحيح'}), 400
         

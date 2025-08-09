@@ -1,0 +1,7 @@
+{
+  "name": "Scene Flow Node Link",
+  "type": "code",
+  "code": "// Flow trigger block\n// FLOW_TRIGGER: id=myTrigger1\n// When the runtime sees this block executed (e.g., via a button click),\n// it will trigger the outgoing link defined in the flow graph for 'myTrigger1'.\n// Example: attach to a mesh action or GUI button:\nif (typeof BABYLON !== 'undefined' && scene) {\n  const flowTrigger = (id) => {\n    if (window && window.__triggerFlowNode) {\n      window.__triggerFlowNode(id);\n    }\n  };\n  // Example (hook to button):\n  // myButton.onPointerUpObservable.add(() => flowTrigger('myTrigger1'));\n}",
+  "created_at": "2025-08-09T14:59:16.441921",
+  "updated_at": "2025-08-09T14:59:16.441940"
+}

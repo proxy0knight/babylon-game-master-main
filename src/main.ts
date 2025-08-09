@@ -4,6 +4,7 @@ import { MainMenu } from '@/components/MainMenu';
 import { GameEngine } from '@/components/GameEngine';
 import { AdminDashboard } from '@/components/AdminDashboard';
 import { SceneBuilder } from '@/components/SceneBuilder';
+import { SceneFlow } from '@/components/SceneFlow';
 
 /**
  * تطبيق محرك الألعاب الرئيسي
@@ -27,6 +28,7 @@ class BabylonGameApp {
         this.router.addRoute('/game', () => this.showGame());
         this.router.addRoute('/admin', () => this.showAdmin());
         this.router.addRoute('/admin/scene-builder', () => this.showSceneBuilder());
+    this.router.addRoute('/admin/scene-flow', () => this.showSceneFlow());
     }
 
     /**
@@ -64,6 +66,15 @@ class BabylonGameApp {
         const sceneBuilder = new SceneBuilder(this.appContainer, this.router);
         sceneBuilder.initialize();
     }
+
+  /**
+   * عرض مخطط المشاهد
+   */
+  private showSceneFlow(): void {
+    this.clearContainer();
+    const flow = new SceneFlow(this.appContainer, this.router);
+    flow.initialize();
+  }
 
     /**
      * تنظيف الحاوية

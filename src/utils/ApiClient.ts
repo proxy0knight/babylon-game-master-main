@@ -11,7 +11,7 @@ export class ApiClient {
     /**
      * حفظ أصل (خريطة، شخصية، أو كائن)
      */
-    async saveAsset(type: 'map' | 'character' | 'object', name: string, code: string): Promise<any> {
+    async saveAsset(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code', name: string, code: string): Promise<any> {
         try {
             const response = await fetch(`${this.baseUrl}/assets/save`, {
                 method: 'POST',
@@ -39,7 +39,7 @@ export class ApiClient {
     /**
      * تحميل أصل محفوظ
      */
-    async loadAsset(type: 'map' | 'character' | 'object', name: string): Promise<any> {
+    async loadAsset(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code', name: string): Promise<any> {
         try {
             const response = await fetch(`${this.baseUrl}/assets/load/${type}/${name}`);
 
@@ -57,7 +57,7 @@ export class ApiClient {
     /**
      * الحصول على قائمة بجميع الأصول من نوع معين
      */
-    async listAssets(type: 'map' | 'character' | 'object'): Promise<any> {
+    async listAssets(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code'): Promise<any> {
         try {
             
             const response = await fetch(`${this.baseUrl}/assets/list/${type}`);
@@ -76,7 +76,7 @@ export class ApiClient {
     /**
      * حذف أصل محفوظ
      */
-    async deleteAsset(type: 'map' | 'character' | 'object', name: string): Promise<any> {
+    async deleteAsset(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code', name: string): Promise<any> {
         try {
             const response = await fetch(`${this.baseUrl}/assets/delete/${type}/${name}`, {
                 method: 'DELETE'
@@ -96,7 +96,7 @@ export class ApiClient {
     /**
      * حفظ صورة مصغرة للأصل
      */
-    async saveThumbnail(type: 'map' | 'character' | 'object', name: string, thumbnailData: string): Promise<any> {
+    async saveThumbnail(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code', name: string, thumbnailData: string): Promise<any> {
         try {
             const response = await fetch(`${this.baseUrl}/assets/save-thumbnail`, {
                 method: 'POST',
@@ -124,7 +124,7 @@ export class ApiClient {
     /**
      * الحصول على رابط الصورة المصغرة للأصل
      */
-    getThumbnailUrl(type: 'map' | 'character' | 'object', name: string): string {
+    getThumbnailUrl(type: 'map' | 'character' | 'object' | 'scene' | 'flow' | 'code', name: string): string {
         return `${this.baseUrl}/assets/thumbnail/${type}/${name}`;
     }
 }

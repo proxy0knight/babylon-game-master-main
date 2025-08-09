@@ -1,0 +1,7 @@
+{
+  "name": "default-flow",
+  "type": "flow",
+  "code": "{\"nodes\":[{\"id\":1,\"name\":\"Game Start\",\"x\":124,\"y\":-23.04168701171875}],\"edges\":[]}",
+  "created_at": "2025-08-09T15:15:42.438074",
+  "updated_at": "2025-08-09T15:15:42.438085"
+}

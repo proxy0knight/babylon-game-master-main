@@ -100,6 +100,7 @@ export class AdminDashboard {
                             <button class="menu-btn" id="load-btn">تحميل</button>
                             <button class="menu-btn" id="library-btn">مكتبة الأصول</button>
                             <button class="menu-btn" id="scene-builder-btn">منشئ المشهد</button>
+                            <button class="menu-btn" id="scene-flow-btn">مخطط المشاهد</button>
                             <div class="separator"></div>
                             <select id="asset-type" class="asset-selector">
                                 <option value="map">خريطة</option>
@@ -905,6 +906,7 @@ export class AdminDashboard {
         const loadBtn = document.getElementById('load-btn');
         const libraryBtn = document.getElementById('library-btn');
         const sceneBuilderBtn = document.getElementById('scene-builder-btn');
+        const sceneFlowBtn = document.getElementById('scene-flow-btn');
         const runBtn = document.getElementById('run-btn');
         const engineSelector = document.getElementById('engine-selector') as HTMLSelectElement;
         const closeLibraryBtn = document.getElementById('close-library-btn');
@@ -934,6 +936,10 @@ export class AdminDashboard {
         sceneBuilderBtn?.addEventListener('click', () => {
             this.cleanup();
             this.router.navigate('/admin/scene-builder');
+        });
+        sceneFlowBtn?.addEventListener('click', () => {
+            this.cleanup();
+            this.router.navigate('/admin/scene-flow');
         });
         runBtn?.addEventListener('click', () => this.runCode());
         
