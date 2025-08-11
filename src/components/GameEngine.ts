@@ -351,7 +351,7 @@ export class GameEngine {
             const response = await fetch('/game-config.json');
             if (response.ok) {
                 const gameConfig = await response.json();
-                console.log('Game configuration loaded:', gameConfig);
+        
                 // تطبيق الإعدادات هنا
             } else {
                 console.warn('Game configuration file not found, using defaults');
@@ -369,7 +369,7 @@ export class GameEngine {
         try {
             // Check for active flow in localStorage
             const activeFlowName = localStorage.getItem('activeFlowName');
-            console.log('Active flow name from localStorage:', activeFlowName);
+    
             
             if (activeFlowName) {
                 console.log(`Loading active flow: ${activeFlowName}`);
@@ -444,16 +444,16 @@ export class GameEngine {
     /**
      * تحميل وتشغيل مشهد معين من المخطط
      */
-    private async loadAndExecuteScene(sceneName: string, flowData: any): Promise<void> {
+    private async loadAndExecuteScene(sceneName: string, flowData: any, mode: 'replace' | 'overlay' = 'replace'): Promise<void> {
         try {
             // Load the scene code
             const sceneResult = await this.apiClient.loadAsset('scene', sceneName);
             
             if (sceneResult.success && sceneResult.data && sceneResult.data.code) {
-                console.log(`Executing scene: ${sceneName}`);
+                console.log(`Executing scene: ${sceneName} (${mode} mode)`);
                 
                 // Execute the scene code instead of the default scene
-                await this.executeSceneCode(sceneResult.data.code, sceneName, flowData);
+                await this.executeSceneCode(sceneResult.data.code, sceneName, flowData, mode);
             } else {
                 console.warn(`Scene not found: ${sceneName}, using default scene`);
                 // Fallback to default if scene not found
@@ -467,7 +467,7 @@ export class GameEngine {
     /**
      * تشغيل كود المشهد
      */
-    private async executeSceneCode(code: string, sceneName: string, flowData: any): Promise<void> {
+    private async executeSceneCode(code: string, sceneName: string, flowData: any, mode: 'replace' | 'overlay' = 'replace'): Promise<void> {
         try {
             // Update the loading text to show current scene
             const loadingText = document.querySelector('.loading-text');
@@ -475,9 +475,17 @@ export class GameEngine {
                 loadingText.textContent = `جاري تحميل المشهد: ${sceneName}`;
             }
 
-            // Clear the current scene
-            if (this.scene) {
-                this.scene.dispose();
+            // Handle scene cleanup based on mode
+            if (mode === 'replace') {
+                // For replace: completely destroy old scene and camera
+                if (this.scene) {
+                    console.log('🔄 Replace mode: Disposing old scene and camera');
+                    this.scene.dispose();
+                }
+            } else if (mode === 'overlay') {
+                // For overlay: keep old scene, just add new one on top
+                console.log('📱 Overlay mode: Keeping old scene, adding new one on top');
+                // Don't dispose the scene, we'll manage camera switching instead
             }
 
             // Import Babylon modules (same as in Scene Builder)
@@ -557,8 +565,32 @@ export class GameEngine {
             
             // Set the returned scene as the active scene
             if (resultScene) {
-                this.scene = resultScene;
-                console.log(`Scene "${sceneName}" loaded successfully with camera:`, this.scene.activeCamera ? 'Yes' : 'No');
+                if (mode === 'overlay') {
+                    // For overlay mode: keep old scene reference but set new scene as active
+                    const oldScene = this.scene;
+                    this.scene = resultScene;
+                    
+                    // Camera is already set on the new scene from createScene function
+                    if (resultScene.activeCamera) {
+                        console.log(`📱 Overlay mode: New scene has active camera`);
+                    } else if (oldScene && oldScene.activeCamera) {
+                        console.log(`📱 Overlay mode: No camera in new scene, setting old camera`);
+                        resultScene.activeCamera = oldScene.activeCamera;
+                    }
+                } else {
+                    // Replace mode: normal behavior
+                    this.scene = resultScene;
+                    
+                    // Ensure we have an active camera
+                    if (resultScene.activeCamera) {
+                        console.log(`🔄 Replace mode: Using scene's camera`);
+                        // Camera is already set on resultScene.activeCamera
+                    } else {
+                        console.warn(`⚠️ Replace mode: No camera found in scene "${sceneName}"`);
+                    }
+                }
+                
+                console.log(`Scene "${sceneName}" loaded successfully (${mode} mode) with camera:`, this.scene.activeCamera ? 'Yes' : 'No');
                 
                 // Set up global flow trigger function for scene code to use
                 (window as any).__triggerFlowNode = (triggerId: string) => {
@@ -580,9 +612,9 @@ export class GameEngine {
     /**
      * الانتقال إلى مشهد آخر في المخطط
      */
-    private async navigateToScene(targetSceneName: string, flowData: any): Promise<void> {
-        console.log(`Navigating to scene: ${targetSceneName}`);
-        await this.loadAndExecuteScene(targetSceneName, flowData);
+    private async navigateToScene(targetSceneName: string, flowData: any, mode: 'replace' | 'overlay' = 'replace'): Promise<void> {
+        console.log(`Navigating to scene: ${targetSceneName} (${mode} mode)`);
+        await this.loadAndExecuteScene(targetSceneName, flowData, mode);
     }
 
     /**
@@ -624,14 +656,16 @@ export class GameEngine {
                 if (targetNode && targetNode.name !== 'Game Start') {
                     console.log(`✅ Triggering flow from ${currentSceneName} to ${targetNode.name} via ${triggerId}`);
                     
-                    // Handle different link types
-                    if (matchingEdge.linkType === 'overlay') {
-                        // For overlay, we could implement a different behavior
-                        // For now, just navigate normally
-                        await this.navigateToScene(targetNode.name, flowData);
+                    // Handle different link types based on edge mode
+                    const linkMode = matchingEdge.mode || matchingEdge.linkType || 'replace';
+                    console.log(`Link mode: ${linkMode}`);
+                    
+                    if (linkMode === 'overlay') {
+                        // For overlay: keep current scene, add new one on top with camera management
+                        await this.navigateToScene(targetNode.name, flowData, 'overlay');
                     } else {
-                        // Default replace behavior
-                        await this.navigateToScene(targetNode.name, flowData);
+                        // Default replace behavior: destroy old scene and create new one
+                        await this.navigateToScene(targetNode.name, flowData, 'replace');
                     }
                 } else {
                     console.warn(`❌ Target node not found or is Game Start node`);

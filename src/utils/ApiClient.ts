@@ -3,7 +3,7 @@
  */
 export class ApiClient {
     private baseUrl: string;
-// change the url foe the api path and make sure it is public
+
     constructor(baseUrl: string = `http://localhost:5001/api`) {
         this.baseUrl = baseUrl;
     }
@@ -128,4 +128,3 @@ export class ApiClient {
         return `${this.baseUrl}/assets/thumbnail/${type}/${name}`;
     }
 }
-

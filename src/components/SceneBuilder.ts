@@ -1,7 +1,8 @@
 import { Router } from '@/utils/Router';
 import { ApiClient } from '@/utils/ApiClient';
-import { getDefaultSceneCode, getWebGPUSceneCode } from '@/assets/defaultScene';
-import { ensureMonacoConfigured } from '@/utils/monaco';
+import { getDefaultSceneCode } from '@/assets/defaultScene';
+
+import { BabylonManager } from '@/utils/BabylonManager';
 
 /**
  * Scene Builder: two-panel tool to assemble scenes with primitives and edit their properties
@@ -10,14 +11,15 @@ export class SceneBuilder {
   private container: HTMLElement;
   private router: Router;
   private api: ApiClient;
+  private babylonManager!: BabylonManager;
 
-  // Babylon
+  // Babylon (managed by BabylonManager)
   private engine: any;
   private scene: any;
   private canvas: HTMLCanvasElement | null = null;
   private camera: any;
   private devCameraEnabled: boolean = true;
-  private isRunning: boolean = false;
+
   private devCamera: any = null;
   private previousUserCamera: any = null;
   private devCamKeyState: { up: boolean; down: boolean } = { up: false, down: false };
@@ -54,10 +56,20 @@ export class SceneBuilder {
     this.container = container;
     this.router = router;
     this.api = new ApiClient();
+    
+    // Initialize BabylonManager
+    this.babylonManager = BabylonManager.getInstance('scene-builder', {
+      canvasId: 'sb-canvas',
+      antialias: true,
+      preserveDrawingBuffer: true,
+      stencil: true
+    });
   }
 
   async initialize(): Promise<void> {
     this.render();
+    // Small delay to ensure DOM is rendered
+    await new Promise(resolve => setTimeout(resolve, 100));
     await this.initBabylon();
     await this.ensureCodeEditor();
     await this.ensureSceneEditor();
@@ -307,43 +319,27 @@ export class SceneBuilder {
   }
 
   private async initBabylon(): Promise<void> {
-    const [
-      { Engine },
-      { Scene },
-      { ArcRotateCamera },
-      { HemisphericLight },
-      { Vector3 },
-      { Color3 }
-    ] = await Promise.all([
-      import('@babylonjs/core/Engines/engine'),
-      import('@babylonjs/core/scene'),
-      import('@babylonjs/core/Cameras/arcRotateCamera'),
-      import('@babylonjs/core/Lights/hemisphericLight'),
-      import('@babylonjs/core/Maths/math.vector'),
-      import('@babylonjs/core/Maths/math.color')
-    ]);
-
-    this.canvas = document.getElementById('sb-canvas') as HTMLCanvasElement;
-    this.engine = new Engine(this.canvas, true, { antialias: true, preserveDrawingBuffer: true, stencil: true });
-    this.scene = new Scene(this.engine);
-
+    // Initialize using BabylonManager
+    await this.babylonManager.initialize();
+    
+    // Get references from manager
+    this.engine = this.babylonManager.getEngine();
+    this.scene = this.babylonManager.getScene();
+    this.canvas = this.babylonManager.getCanvas();
+    
+    // Set up default camera and lighting using the execution context
+    const context = this.babylonManager.getExecutionContext();
+    
     // Camera
-    this.camera = new ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 15, new Vector3(0, 2, 0), this.scene);
+    this.camera = new context.BABYLON.ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 15, new context.BABYLON.Vector3(0, 2, 0), this.scene);
     this.camera.attachControl(this.canvas, true);
 
     // Light
-    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
+    const light = new context.BABYLON.HemisphericLight('light', new context.BABYLON.Vector3(0, 1, 0), this.scene);
     light.intensity = 0.9;
-    (light as any).diffuse = new Color3(1, 1, 1);
+    light.diffuse = new context.BABYLON.Color3(1, 1, 1);
 
-    this.engine.runRenderLoop(() => {
-      const currentScene = this.scene;
-      if (currentScene) {
-        try { currentScene.render(); } catch {}
-      }
-    });
-    this.isRunning = true;
-    window.addEventListener('resize', () => this.engine.resize());
+
 
     // Ensure dev camera state is respected on initial load
     this.updateDevCameraState();
@@ -351,12 +347,38 @@ export class SceneBuilder {
 
   private async ensureCodeEditor(): Promise<void> {
     try {
-      ensureMonacoConfigured();
+      // Configure Monaco Environment to disable all workers (same as AdminDashboard)
+      (window as any).MonacoEnvironment = {
+        getWorker: () => {
+          return {
+            postMessage: () => {},
+            terminate: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {}
+          };
+        }
+      };
+
       const monaco = await import('monaco-editor');
+      
+      // Disable language features that require workers
+      monaco.languages.typescript.javascriptDefaults.setWorkerOptions({
+        customWorkerPath: undefined
+      });
+      monaco.languages.typescript.typescriptDefaults.setWorkerOptions({
+        customWorkerPath: undefined
+      });
+
       const host = document.getElementById('sb-code-editor');
-      if (!host) return;
+      if (!host) {
+        console.error('SceneBuilder: Code editor element not found!');
+        return;
+      }
+      
+      const defaultCode = getDefaultSceneCode();
+      
       this.codeEditor = monaco.editor.create(host, {
-        value: getDefaultSceneCode(),
+        value: defaultCode,
         language: 'javascript',
         theme: 'vs-dark',
         readOnly: false,
@@ -367,9 +389,33 @@ export class SceneBuilder {
         fontSize: 12,
         wordWrapColumn: 120,
         scrollbar: { vertical: 'auto', horizontal: 'auto' },
-        scrollBeyondLastLine: false
+        scrollBeyondLastLine: false,
+        // Disable features that require workers to avoid errors
+        quickSuggestions: false,
+        parameterHints: { enabled: false },
+        suggestOnTriggerCharacters: false,
+        acceptSuggestionOnEnter: "off",
+        tabCompletion: "off",
+        wordBasedSuggestions: "off",
       });
-    } catch {
+
+      // Force LTR direction on the editor
+      const editorDomNode = this.codeEditor.getDomNode();
+      if (editorDomNode) {
+        editorDomNode.style.direction = 'ltr';
+        editorDomNode.dir = 'ltr';
+        
+        // Also set direction on editor container
+        const editorContainer = editorDomNode.querySelector('.monaco-editor');
+        if (editorContainer) {
+          (editorContainer as HTMLElement).style.direction = 'ltr';
+          (editorContainer as HTMLElement).dir = 'ltr';
+        }
+      }
+      
+
+    } catch (error) {
+      console.error('SceneBuilder: Failed to create Monaco editor:', error);
       this.codeEditor = null;
     }
   }
@@ -385,154 +431,19 @@ export class SceneBuilder {
     const code = this.codeEditor.getValue();
     try {
       if (status) status.textContent = 'تشغيل الكود...';
-      // Dispose current scene only
-      if (this.scene) {
-        try { this.scene.dispose(); } catch {}
-      }
-      const [
-        BABYLON_CORE,
-        { Scene },
-        { FreeCamera },
-        { ArcRotateCamera },
-        { HemisphericLight },
-        { Vector3 },
-        { MeshBuilder },
-        { Color3 },
-        BABYLON_GUI
-      ] = await Promise.all([
-        import('@babylonjs/core'),
-        import('@babylonjs/core/scene'),
-        import('@babylonjs/core/Cameras/freeCamera'),
-        import('@babylonjs/core/Cameras/arcRotateCamera'),
-        import('@babylonjs/core/Lights/hemisphericLight'),
-        import('@babylonjs/core/Maths/math.vector'),
-        import('@babylonjs/core/Meshes/meshBuilder'),
-        import('@babylonjs/core/Maths/math.color'),
-        import('@babylonjs/gui')
-      ]);
-      // Register GLTF loader (needed by many examples)
-      try {
-        const { SceneLoader } = await import('@babylonjs/core/Loading/sceneLoader');
-        const { GLTFFileLoader } = await import('@babylonjs/loaders/glTF/glTFFileLoader');
-        SceneLoader.RegisterPlugin(new GLTFFileLoader());
-      } catch {}
-      // Ensure Babylon file loader (for .babylon) is registered as well
-      try {
-        await import('@babylonjs/core/Loading/Plugins/babylonFileLoader');
-      } catch {}
-      const BABYLON = { ...BABYLON_CORE, Scene, FreeCamera, ArcRotateCamera, HemisphericLight, Vector3, MeshBuilder, Color3, GUI: BABYLON_GUI } as any;
-      // Create fresh scene
-      this.scene = new Scene(this.engine);
-      (window as any).BABYLON = BABYLON;
-
-      const runner = new Function('engine','canvas','BABYLON', `
-        // Redirect external asset paths to external-import/ like the AdminDashboard
-        if (typeof BABYLON !== 'undefined') {
-          const convertAssetPath = function(url) {
-            if (!url || typeof url !== 'string') return url;
-            // Ensure absolute external-import path
-            if (url.startsWith('/external-import/')) return url;
-            if (url.startsWith('external-import/')) return '/' + url;
-            if (url.startsWith('http') || url.startsWith('/') || url.startsWith('data:') || url.startsWith('blob:')) return url;
-            return '/external-import/' + url;
-          };
-          // Compat: robust BABYLON.ImportMeshAsync wrapper supporting (fullPath, scene) and classic signature
-          if (BABYLON.SceneLoader && BABYLON.SceneLoader.ImportMeshAsync) {
-            const _originalImportMeshAsync = BABYLON.SceneLoader.ImportMeshAsync.bind(BABYLON.SceneLoader);
-            BABYLON.ImportMeshAsync = function(arg1, arg2, arg3, arg4) {
-              // (fullPath, scene)
-              if (typeof arg1 === 'string' && arg2 && typeof arg2 === 'object' && !arg3 && !arg4) {
-                const fullPath = convertAssetPath(arg1);
-                const lastSlash = fullPath.lastIndexOf('/') + 1;
-                const rootUrl = fullPath.substring(0, lastSlash);
-                const sceneFilename = fullPath.substring(lastSlash);
-                return _originalImportMeshAsync('', rootUrl, sceneFilename, arg2);
-              }
-              // (meshesNames, rootUrl, sceneFilename, scene)
-              const meshesNames = arg1;
-              const rootUrl = convertAssetPath(arg2 || '');
-              const sceneFilename = arg3 || '';
-              const scene = arg4 || null;
-              return _originalImportMeshAsync(meshesNames, rootUrl, sceneFilename, scene);
-            };
-          }
-          if (BABYLON.SceneLoader && BABYLON.SceneLoader.ImportMesh) {
-            const originalImportMesh = BABYLON.SceneLoader.ImportMesh;
-            BABYLON.SceneLoader.ImportMesh = function(meshNames, rootUrl, sceneFilename, scene, onSuccess, onProgress, onError, pluginExtension) {
-              rootUrl = convertAssetPath(rootUrl || '');
-              sceneFilename = sceneFilename || '';
-              return originalImportMesh.call(this, meshNames, rootUrl, sceneFilename, scene, onSuccess, onProgress, onError, pluginExtension);
-            };
-          }
-          if (BABYLON.SceneLoader && BABYLON.SceneLoader.AppendAsync) {
-            const originalAppendAsync = BABYLON.SceneLoader.AppendAsync;
-            BABYLON.SceneLoader.AppendAsync = function(rootUrl, sceneFilename, scene, onProgress, pluginExtension) {
-              rootUrl = convertAssetPath(rootUrl || '');
-              sceneFilename = sceneFilename || '';
-              return originalAppendAsync.call(this, rootUrl, sceneFilename, scene, onProgress, pluginExtension);
-            };
-          }
-          // Compat: BABYLON.AppendAsync single full path support
-          if (!BABYLON.AppendAsync && BABYLON.SceneLoader && BABYLON.SceneLoader.AppendAsync) {
-            BABYLON.AppendAsync = function(fullPath, scene, options) {
-              const path = convertAssetPath(fullPath || '');
-              const idx = path.lastIndexOf('/') + 1;
-              const rootUrl = path.substring(0, idx);
-              const filename = path.substring(idx);
-              return BABYLON.SceneLoader.AppendAsync(rootUrl, filename, scene, options);
-            };
-          }
-          if (BABYLON.Texture) {
-            const OriginalTexture = BABYLON.Texture;
-            BABYLON.Texture = function(url, sceneOrEngine, noMipmapOrOptions, invertY, samplingMode, onLoad, onError, buffer, deleteBuffer, format, mimeType, loaderOptions, creationFlags, forcedExtension) {
-              if (url && typeof url === 'string') url = convertAssetPath(url);
-              return new OriginalTexture(url, sceneOrEngine, noMipmapOrOptions, invertY, samplingMode, onLoad, onError, buffer, deleteBuffer, format, mimeType, loaderOptions, creationFlags, forcedExtension);
-            };
-            Object.setPrototypeOf(BABYLON.Texture, OriginalTexture);
-            Object.assign(BABYLON.Texture, OriginalTexture);
-          }
-          // Also override FileTools.LoadFile to normalize arbitrary loads
-          if (BABYLON.FileTools && BABYLON.FileTools.LoadFile) {
-            const originalLoadFile = BABYLON.FileTools.LoadFile;
-            BABYLON.FileTools.LoadFile = function(url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError) {
-              url = convertAssetPath(url);
-              return originalLoadFile.call(this, url, onSuccess, onProgress, offlineProvider, useArrayBuffer, onError);
-            };
-          }
-        }
-        ${code}
-        return {
-          engine: engine,
-          canvas: canvas,
-          scene: (typeof scene!=='undefined'?scene:null),
-          createScene: (typeof createScene==='function'?createScene:null),
-          delayCreateScene: (typeof delayCreateScene==='function'?delayCreateScene:null)
-        };
-      `);
-      const result = runner(this.engine, this.canvas, BABYLON);
-      if (result && result.createScene) {
-        this.scene = await result.createScene();
-      } else if (result && result.delayCreateScene) {
-        this.scene = await result.delayCreateScene();
-      } else if (result && result.scene) {
-        this.scene = result.scene;
-      }
+      
+      // Use BabylonManager to execute the scene code
+      const resultScene = await this.babylonManager.executeSceneCode(code);
+      
+      // Update our reference to the scene
+      this.scene = resultScene || this.babylonManager.getScene();
 
       // Apply developer camera policy after user scene setup
       this.updateDevCameraState();
 
-      // Start loop if not running
-      if (!this.isRunning) {
-        this.engine.runRenderLoop(() => {
-          if (this.scene) {
-            try { this.scene.render(); } catch {}
-          }
-        });
-        this.isRunning = true;
-      }
       if (status) status.textContent = 'تم التنفيذ';
     } catch (e) {
-      console.error(e);
+      console.error('SceneBuilder: Error executing scene code:', e);
       if (status) status.textContent = 'خطأ أثناء التشغيل';
     }
   }
@@ -544,18 +455,20 @@ export class SceneBuilder {
     this.updateDevCameraState();
   }
 
-  private cleanScene(): void {
+  private async cleanScene(): Promise<void> {
     if (this.codeEditor && typeof this.codeEditor.setValue === 'function') {
       this.codeEditor.setValue(getDefaultSceneCode());
     }
-    if (this.scene) {
-      try { this.scene.dispose(); } catch {}
-    }
-    // Create a fresh empty scene so the render loop remains valid
-    import('@babylonjs/core/scene').then(({ Scene }) => {
-      this.scene = new Scene(this.engine);
+    
+    // Use BabylonManager to execute the default scene code
+    try {
+      const defaultCode = getDefaultSceneCode();
+      const resultScene = await this.babylonManager.executeSceneCode(defaultCode);
+      this.scene = resultScene || this.babylonManager.getScene();
       this.updateDevCameraState();
-    });
+    } catch (error) {
+      console.error('SceneBuilder: Error cleaning scene:', error);
+    }
   }
 
   private updateDevCameraState(): void {
@@ -821,17 +734,11 @@ export class SceneBuilder {
     }
   }
 
-  private removeSelected(): void {
-    const sel = this.getSelected();
-    if (!sel) return;
-    try { sel.mesh.dispose(); } catch {}
-    this.items = this.items.filter(i => i.id !== sel.id);
-    this.selectedItemId = null;
-    this.refreshList();
-  }
+
 
   cleanup(): void {
-    if (this.engine) this.engine.dispose();
+    // Cleanup BabylonManager
+    this.babylonManager.dispose();
     if (this.codeEditor && this.codeEditor.dispose) this.codeEditor.dispose();
     if (this.sceneEditor && this.sceneEditor.dispose) this.sceneEditor.dispose();
   }
@@ -847,8 +754,28 @@ export class SceneBuilder {
     const ensurePreviewEditor = async () => {
       if (this.libCodeEditor) return;
       try {
-        ensureMonacoConfigured();
+        // Configure Monaco Environment to disable all workers (same as main editor)
+        (window as any).MonacoEnvironment = {
+          getWorker: () => {
+            return {
+              postMessage: () => {},
+              terminate: () => {},
+              addEventListener: () => {},
+              removeEventListener: () => {}
+            };
+          }
+        };
+
         const monaco = await import('monaco-editor');
+        
+        // Disable language features that require workers
+        monaco.languages.typescript.javascriptDefaults.setWorkerOptions({
+          customWorkerPath: undefined
+        });
+        monaco.languages.typescript.typescriptDefaults.setWorkerOptions({
+          customWorkerPath: undefined
+        });
+
         const host = document.getElementById('sb-lib-code-editor');
         if (!host) return;
         this.libCodeEditor = monaco.editor.create(host, {
@@ -863,8 +790,29 @@ export class SceneBuilder {
           fontSize: 12,
           wordWrapColumn: 120,
           scrollbar: { vertical: 'auto', horizontal: 'auto' },
-          scrollBeyondLastLine: false
+          scrollBeyondLastLine: false,
+          // Disable features that require workers to avoid errors
+          quickSuggestions: false,
+          parameterHints: { enabled: false },
+          suggestOnTriggerCharacters: false,
+          acceptSuggestionOnEnter: "off",
+          tabCompletion: "off",
+          wordBasedSuggestions: "off",
         });
+
+        // Force LTR direction on the editor
+        const editorDomNode = this.libCodeEditor.getDomNode();
+        if (editorDomNode) {
+          editorDomNode.style.direction = 'ltr';
+          editorDomNode.dir = 'ltr';
+          
+          // Also set direction on editor container
+          const editorContainer = editorDomNode.querySelector('.monaco-editor');
+          if (editorContainer) {
+            (editorContainer as HTMLElement).style.direction = 'ltr';
+            (editorContainer as HTMLElement).dir = 'ltr';
+          }
+        }
       } catch {
         this.libCodeEditor = null;
       }
@@ -1107,32 +1055,7 @@ export class SceneBuilder {
     }
   }
 
-  private extractAssetReferences(code: string): string[] {
-    const references: string[] = [];
-    
-    // Extract references to external-import assets
-    const externalImportRegex = /['"`].*?\/external-import\/([^'"`]+)['"`]/g;
-    let match;
-    while ((match = externalImportRegex.exec(code)) !== null) {
-      references.push(match[1]);
-    }
-    
-    // Extract SceneLoader references
-    const sceneLoaderRegex = /SceneLoader\.\w+\([^,]*['"`]([^'"`]+)['"`]/g;
-    while ((match = sceneLoaderRegex.exec(code)) !== null) {
-      if (match[1].includes('external-import/')) {
-        references.push(match[1].replace('external-import/', ''));
-      }
-    }
-    
-    // Extract mesh/texture asset names used in the code
-    const assetNameRegex = /(?:loadAsset|importMesh|loadTexture)\([^,]*['"`]([^'"`]+)['"`]/g;
-    while ((match = assetNameRegex.exec(code)) !== null) {
-      references.push(match[1]);
-    }
-    
-    return [...new Set(references)]; // Remove duplicates
-  }
+
 
   private async copyProjectAssets(type: 'map' | 'character' | 'object' | 'scene' | 'code', name: string): Promise<void> {
     try {
@@ -1174,7 +1097,7 @@ export class SceneBuilder {
     }
   }
 
-  private updateImportStatus(text: string, cls: 'success' | 'error' | 'processing'): void {
+  private updateImportStatus(text: string, _cls: 'success' | 'error' | 'processing'): void {
     const el = document.getElementById('import-status');
     if (!el) return;
     el.textContent = text;
@@ -1224,64 +1147,9 @@ export class SceneBuilder {
     }
   }
 
-  private openLoadOverlay(): void {
-    const ov = document.getElementById('sb-load-overlay');
-    const close = document.getElementById('sb-load-close');
-    if (!ov || !close) return;
-    ov.classList.remove('hidden');
-    close.addEventListener('click', () => ov.classList.add('hidden'));
-    this.populateLoadList();
-  }
 
-  private async populateLoadList(): Promise<void> {
-    const grid = document.getElementById('sb-load-grid');
-    if (!grid) return;
-    grid.innerHTML = 'جاري التحميل...';
-    try {
-      const result = await this.api.listAssets('scene');
-      const maps: Array<{ name: string; has_thumbnail?: boolean }> = result.assets || [];
-      grid.innerHTML = '';
-      maps.forEach(m => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        const thumb = document.createElement('div');
-        thumb.className = 'thumb';
-        if (m.has_thumbnail) {
-          const img = document.createElement('img');
-          img.src = this.api.getThumbnailUrl('scene', m.name);
-          img.style.maxWidth = '100%';
-          img.style.maxHeight = '100%';
-          thumb.innerHTML = '';
-          thumb.appendChild(img);
-        } else {
-          thumb.textContent = 'لا توجد صورة';
-        }
-        const body = document.createElement('div');
-        body.className = 'card-body';
-        const span = document.createElement('span');
-        span.textContent = m.name;
-        const btn = document.createElement('button');
-        btn.className = 'btn small';
-          btn.textContent = 'تحميل الكود';
-        btn.addEventListener('click', async () => {
-          try {
-            const data = await this.api.loadAsset('scene', m.name);
-            const code = data?.data?.code || '';
-            if (this.codeEditor && code) this.codeEditor.setValue(code);
-          } catch {}
-          const ov = document.getElementById('sb-load-overlay');
-          ov?.classList.add('hidden');
-        });
-        body.appendChild(span);
-        body.appendChild(btn);
-        card.appendChild(thumb);
-        card.appendChild(body);
-        grid.appendChild(card);
-      });
-    } catch (e) {
-      grid.textContent = 'فشل التحميل';
-    }
-  }
+
+
 
   private async loadSceneByName(name: string): Promise<void> {
     try {
@@ -1399,47 +1267,7 @@ export class SceneBuilder {
     this.refreshSceneJSON();
   }
 
-  private openChooseBaseMapOverlay(): void {
-    const ov = document.getElementById('sb-base-overlay');
-    const close = document.getElementById('sb-base-close');
-    if (!ov || !close) return;
-    ov.classList.remove('hidden');
-    close.addEventListener('click', () => ov.classList.add('hidden'));
-    (async () => {
-      const grid = document.getElementById('sb-base-grid');
-      if (!grid) return;
-      grid.innerHTML = 'جاري التحميل...';
-      try {
-        const result = await this.api.listAssets('map');
-        const maps: Array<{ name: string; has_thumbnail?: boolean }> = result.assets || [];
-        grid.innerHTML = '';
-        // Empty scene option
-        const empty = document.createElement('div');
-        empty.className = 'card';
-        const et = document.createElement('div'); et.className = 'thumb'; et.textContent = 'مشهد فارغ';
-        const eb = document.createElement('div'); eb.className = 'card-body';
-        const ebSpan = document.createElement('span'); ebSpan.textContent = 'أرضية افتراضية بالحجم الحالي';
-        const ebBtn = document.createElement('button'); ebBtn.className = 'btn small'; ebBtn.textContent = 'اختيار';
-        ebBtn.addEventListener('click', () => { this.addPrimitive('ground'); ov.classList.add('hidden'); });
-        eb.appendChild(ebSpan); eb.appendChild(ebBtn); empty.appendChild(et); empty.appendChild(eb); grid.appendChild(empty);
-        // Existing maps
-        maps.forEach(m => {
-          const card = document.createElement('div'); card.className = 'card';
-          const thumb = document.createElement('div'); thumb.className = 'thumb';
-          if (m.has_thumbnail) {
-            const img = document.createElement('img'); img.src = this.api.getThumbnailUrl('map', m.name); img.style.maxWidth = '100%'; img.style.maxHeight = '100%'; thumb.innerHTML = ''; thumb.appendChild(img);
-          } else { thumb.textContent = 'لا توجد صورة'; }
-          const body = document.createElement('div'); body.className = 'card-body';
-          const span = document.createElement('span'); span.textContent = m.name;
-          const btn = document.createElement('button'); btn.className = 'btn small'; btn.textContent = 'استخدام كأساس';
-          btn.addEventListener('click', async () => { await this.loadSceneByName(m.name); ov.classList.add('hidden'); });
-          body.appendChild(span); body.appendChild(btn);
-          card.appendChild(thumb); card.appendChild(body);
-          grid.appendChild(card);
-        });
-      } catch { grid.textContent = 'فشل التحميل'; }
-    })();
-  }
+
 }
 
 
